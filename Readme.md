@@ -75,7 +75,7 @@
             h. google_id
             i. timestamp
 
-        2. Resume Table
+        3. Resume Table
             a. id
             b. user_id
             c. tempate_id
@@ -85,7 +85,7 @@
             g. file_url
             g. timestamp
         
-        3. Template Table
+        4. Template Table
             a. id
             b. name
             c. template_preview
@@ -227,3 +227,4 @@
     a. Response Helper
     a. Validation Helper
     b. Pagination Helper
+
