@@ -1,6 +1,9 @@
 package com.example.resume.controller;
 
 import com.example.resume.dto.Request.LoginRequest;
+import com.example.resume.dto.Request.RegisterRequest;
+import com.example.resume.dto.Response.ApiResponse;
+import com.example.resume.dto.Response.AuthResponse;
 import com.example.resume.services.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -14,15 +17,13 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/register")
-    private ResponseEntity<String> register(@RequestBody RegisterRequest request){
-        String token =  authService.register(request);
-        return ResponseEntity.ok("Token" + token);
+    public ApiResponse<AuthResponse> register(@RequestBody RegisterRequest request) {
+        return authService.register(request);
     }
 
     @PostMapping("/login")
-    private ResponseEntity<String> login(@RequestBody LoginRequest request){
-            String token =  authService.login(request);
-            return ResponseEntity.ok("Token" + token);
+    public ApiResponse<AuthResponse> login(@RequestBody LoginRequest request) {
+        return authService.login(request);
     }
 
     @GetMapping("/test")
