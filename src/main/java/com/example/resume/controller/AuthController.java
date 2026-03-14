@@ -21,9 +21,19 @@ public class AuthController {
         return authService.register(request);
     }
 
+    @GetMapping("/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
+        return ResponseEntity.ok(authService.verifyEmail(token));
+    }
+
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthResponse> refreshToken(@RequestBody String token) {
+        return authService.refreshToken(token);
     }
 
     @GetMapping("/test")

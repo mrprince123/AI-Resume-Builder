@@ -4,9 +4,12 @@ import com.example.resume.dto.Request.LoginRequest;
 import com.example.resume.dto.Request.RegisterRequest;
 import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.dto.Response.AuthResponse;
+import com.example.resume.dto.UserInfo;
 import com.example.resume.entity.User;
+import com.example.resume.entity.VerificationToken;
 import com.example.resume.enums.Role;
 import com.example.resume.repository.UserRepository;
+import com.example.resume.repository.VerificationTokenRepository;
 import com.example.resume.utils.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +17,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.security.authentication.AuthenticationManager;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -28,6 +33,12 @@ public class AuthService {
     private AuthenticationManager authenticationManager;
 
     @Autowired
+    private VerificationTokenRepository verificationTokenRepository;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -36,13 +47,12 @@ public class AuthService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-
     public ApiResponse<AuthResponse> register(RegisterRequest request){
         try {
 
             // check if the user already exists
             // 1. Check if username already exists
-            if (userService.existsByUsername(request.getFullName())) {
+            if (userService.existsByUsername(request.getUserName())) {
                 return ApiResponse.<AuthResponse>builder()
                         .status("failed")
                         .message("Username already exists")
@@ -59,14 +69,15 @@ public class AuthService {
                         .build();
             }
 
-            // if not create send verification link on email - future
-
             // if verify then save data to the database
             User newUser = new User();
-            newUser.setUserName(request.getFullName());
+            newUser.setUserName(request.getUserName());
             newUser.setEmail(request.getEmail());
             newUser.setPassword(passwordEncoder.encode(request.getPassword()));
             newUser.setRole(Role.ADMIN);
+            newUser.setVerified(false);
+            newUser.setCreatedAt(LocalDateTime.now());
+            newUser.setUpdatedAt(LocalDateTime.now());
 
             userService.save(newUser);
 
@@ -74,7 +85,21 @@ public class AuthService {
             String accessToken = jwtUtil.generateAccessToken(newUser.getUserName());
             String refreshToken = jwtUtil.generateRefreshToken(newUser.getUserName());
 
-            log.info("User registered successfully: {}", request.getFullName());
+            // Create Token and Save to the Database;
+            String token = UUID.randomUUID().toString();
+            VerificationToken verifyToken = VerificationToken.builder()
+                    .token(token)
+                    .user(newUser)
+                    .createdAt(LocalDateTime.now())
+                    .expiresAt(LocalDateTime.now().plusHours(1))
+                    .build();
+
+            verificationTokenRepository.save(verifyToken);
+
+            // send email
+            emailService.sendVerificationEmail(newUser.getEmail(), token);
+
+            log.info("User registered successfully: {}", request.getUserName());
 
             AuthResponse authResponse = AuthResponse.builder()
                     .accessToken(accessToken)
@@ -100,24 +125,79 @@ public class AuthService {
         }
     }
 
+    public ApiResponse<Void> verifyEmail(String token){
+        try {
+            // find the token first
+            VerificationToken verificationToken = verificationTokenRepository.findByToken(token).orElseThrow(() -> new RuntimeException("Invalid verification token"));
+
+            // check if token is expired
+            if(verificationToken.getExpiresAt().isBefore(LocalDateTime.now())){
+                verificationTokenRepository.delete(verificationToken);
+                return ApiResponse.<Void>builder()
+                        .status("failed")
+                        .message("Verification link has expired. Please register again.")
+                        .build();
+            }
+
+            // Mark user as verified
+            User user = verificationToken.getUser();
+            user.setVerified(true);
+            userService.save(user);
+
+            verificationTokenRepository.delete(verificationToken);
+
+            log.info("Email verified successully for user: {}", user.getEmail());
+
+            return ApiResponse.<Void>builder()
+                    .status("success")
+                    .message("Email verified successfully! You can now login.")
+                    .build();
+
+        } catch (Exception e){
+            log.error("Email verification error", e);
+            return ApiResponse.<Void>builder()
+                    .status("failed")
+                    .message("Invalid or expired verification token.")
+                    .build();
+        }
+    }
+
     public ApiResponse<AuthResponse> login(LoginRequest request){
+
+
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                    new UsernamePasswordAuthenticationToken(request.getUserName(), request.getPassword())
             );
 
-            UserDetails user =  userService.loadUserByUsername(request.getUsername());
+            User user =  userService.findByUsername(request.getUserName());
 
-            String accessToken = jwtUtil.generateAccessToken(user.getUsername());
-            String refreshToken = jwtUtil.generateRefreshToken(user.getUsername());
+            if(!user.isVerified()){
+                return ApiResponse.<AuthResponse>builder()
+                        .status("failed")
+                        .message("Please verify your email before logging in.")
+                        .data(null)
+                        .build();
+            }
 
-            log.info("User Login successfully: {}", request.getUsername());
+            String accessToken = jwtUtil.generateAccessToken(user.getUserName());
+            String refreshToken = jwtUtil.generateRefreshToken(user.getUserName());
+
+            log.info("User Login successfully: {}", request.getUserName());
+
+            UserInfo userInfo = UserInfo.builder()
+                    .id(user.getId())
+                    .userName(user.getUserName())
+                    .email(user.getEmail())
+                    .role(user.getRole())
+                    .build();
 
             AuthResponse authResponse = AuthResponse.builder()
                     .accessToken(accessToken)
                     .refreshToken(refreshToken)
                     .tokenType("Bearer")
                     .expiresIn(900)
+                    .user(userInfo)
                     .build();
 
             return ApiResponse.<AuthResponse>builder()
@@ -127,7 +207,7 @@ public class AuthService {
                     .build();
 
         } catch (Exception e) {
-            log.error("Unexpected login error for user: {}", request.getUsername(), e);
+            log.error("Unexpected login error for user: {}", request.getUserName(), e);
             return ApiResponse.<AuthResponse>builder()
                     .status("failed")
                     .message("An unexpected error occurred. Please try again.")
@@ -136,26 +216,25 @@ public class AuthService {
         }
     }
 
-
     public void logout(){
 
     }
 
-    public ApiResponse<AuthResponse> refreshToken(String refreshToken) {
-        String username = jwtUtil.extractUsername(refreshToken);
+    public ApiResponse<AuthResponse> refreshToken(String token) {
+        String username = jwtUtil.extractUsername(token);
 
         UserDetails user = userService.loadUserByUsername(username);
 
-        if (!jwtUtil.validateToken(refreshToken, user)) {
+        if (!jwtUtil.validateToken(token, user)) {
             throw new RuntimeException("Invalid refresh token");
         }
 
-        String newAccessToken = jwtUtil.generateAccessToken(username);   // ✅ Fixed
-        String newRefreshToken = jwtUtil.generateRefreshToken(username); // ✅ Rotated
+        String newAccessToken = jwtUtil.generateAccessToken(username);
+        String newRefreshToken = jwtUtil.generateRefreshToken(username);
 
         AuthResponse authResponse = AuthResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(newRefreshToken) // ✅ Return new refresh token
+                .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(900)
                 .build();
@@ -166,7 +245,5 @@ public class AuthService {
                 .data(authResponse)
                 .build();
     }
-
-
 
 }
