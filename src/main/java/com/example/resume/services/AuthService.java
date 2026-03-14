@@ -1,5 +1,6 @@
 package com.example.resume.services;
 
+import com.example.resume.dto.Request.GoogleAuthRequest;
 import com.example.resume.dto.Request.LoginRequest;
 import com.example.resume.dto.Request.RegisterRequest;
 import com.example.resume.dto.Response.ApiResponse;
@@ -10,7 +11,9 @@ import com.example.resume.entity.VerificationToken;
 import com.example.resume.enums.Role;
 import com.example.resume.repository.UserRepository;
 import com.example.resume.repository.VerificationTokenRepository;
+import com.example.resume.utils.GoogleTokenVerifier;
 import com.example.resume.utils.JwtUtil;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -46,6 +49,8 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private GoogleTokenVerifier googleTokenVerifier;
 
     public ApiResponse<AuthResponse> register(RegisterRequest request){
         try {
@@ -245,5 +250,91 @@ public class AuthService {
                 .data(authResponse)
                 .build();
     }
+
+    public ApiResponse<AuthResponse> googleLogin(GoogleAuthRequest request){
+        try {
+            GoogleIdToken.Payload payload = googleTokenVerifier.verify(request.getIdToken());
+
+            String email = payload.getEmail();
+            String fullName = (String) payload.get("name");
+            String googleId = payload.getSubject();
+            String picture = (String) payload.get("picture");
+
+            User user = userRepository.findByEmail(email).orElseGet(() -> {
+
+
+                // Auto Generate unique username from email
+                String baseUsername = email.split("@")[0];
+                String username = generateUniqueUsername(baseUsername);
+
+                User newUser = new User();
+                newUser.setUserName(username);
+                newUser.setEmail(email);
+                newUser.setVerified(true);
+                newUser.setGoogleId(googleId);
+                newUser.setPassword(null);
+                newUser.setRole(Role.USER);
+
+               return userRepository.save(newUser);
+            });
+
+            // If existing user, link Google ID if not already linked
+            if (user.getGoogleId() == null) {
+                user.setGoogleId(googleId);
+                userRepository.save(user);
+            }
+
+            // Generate your own JWT
+            String accessToken = jwtUtil.generateAccessToken(user.getUserName());
+            String refreshToken = jwtUtil.generateRefreshToken(user.getUserName());
+
+            UserInfo userInfo = UserInfo.builder()
+                    .id(user.getId())
+                    .userName(user.getUserName())
+                    .email(user.getEmail())
+                    .role(user.getRole())
+                    .build();
+
+            AuthResponse authResponse = AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .expiresIn(900)
+                    .user(userInfo)
+                    .build();
+
+            log.info("Google login successful for: {}", email);
+
+            return ApiResponse.<AuthResponse>builder()
+                    .status("success")
+                    .message("Login successful")
+                    .data(authResponse)
+                    .build();
+
+
+        } catch (Exception e){
+            log.error("Google login error", e);
+            return ApiResponse.<AuthResponse>builder()
+                    .status("failed")
+                    .message("Google login failed. Please try again.")
+                    .data(null)
+                    .build();
+        }
+
+    }
+
+    private String generateUniqueUsername(String base) {
+        String username = base;
+        int counter = 1;
+        while (userRepository.existsByUserName(username)) {
+            username = base + counter++;
+        }
+        return username;
+    }
+
+
+
+
+
 
 }

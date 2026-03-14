@@ -51,6 +51,14 @@
 			<scope>compile</scope>
 		</dependency>
 
+		<!-- Source: https://mvnrepository.com/artifact/com.google.api-client/google-api-client -->
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>2.9.0</version>
+			<scope>compile</scope>
+		</dependency>
+
 
 		<!-- Source: https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui -->
 		<dependency>

@@ -9,6 +9,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @Slf4j
 public class UserService implements UserDetailsService {
@@ -31,7 +33,6 @@ public class UserService implements UserDetailsService {
         throw new UsernameNotFoundException("User not found with username" + username);
     }
 
-
     public User save(User user) {
         log.info("Saving user: {}", user.getEmail());
         return userRepository.save(user);
@@ -41,12 +42,11 @@ public class UserService implements UserDetailsService {
         return userRepository.existsByUserName(username);
     }
 
-
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
     }
 
-    public User findByEmail(String email) {
+    public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
 

@@ -2,13 +2,13 @@ package com.example.resume.entity;
 
 import com.example.resume.enums.Role;
 
+import com.example.resume.enums.Status;
 import jakarta.persistence.*;
 
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 
 @Getter
 @Setter
@@ -26,11 +26,16 @@ public class User {
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
+    @Column(name = "google_id", unique = true)
+    private String googleId;
+
     @Column(nullable = false)
     private String password;
 
     @Column(nullable = false)
     private Role role;
+
+    private Status status;
 
     @Column(name = "is_verified", nullable = false)
     private boolean isVerified;

@@ -1,5 +1,6 @@
 package com.example.resume.controller;
 
+import com.example.resume.dto.Request.GoogleAuthRequest;
 import com.example.resume.dto.Request.LoginRequest;
 import com.example.resume.dto.Request.RegisterRequest;
 import com.example.resume.dto.Response.ApiResponse;
@@ -34,6 +35,11 @@ public class AuthController {
     @PostMapping("/refresh")
     public ApiResponse<AuthResponse> refreshToken(@RequestBody String token) {
         return authService.refreshToken(token);
+    }
+
+    @PostMapping("/google")
+    public ApiResponse<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request){
+        return authService.googleLogin(request);
     }
 
     @GetMapping("/test")
