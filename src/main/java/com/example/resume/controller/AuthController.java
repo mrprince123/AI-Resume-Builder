@@ -6,6 +6,7 @@ import com.example.resume.dto.Request.RegisterRequest;
 import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.dto.Response.AuthResponse;
 import com.example.resume.services.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,8 +29,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<AuthResponse> login(@RequestBody LoginRequest request) {
-        return authService.login(request);
+    public ApiResponse<AuthResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        return authService.login(loginRequest, request);
     }
 
     @PostMapping("/refresh")

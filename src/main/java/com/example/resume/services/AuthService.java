@@ -7,13 +7,18 @@ import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.dto.Response.AuthResponse;
 import com.example.resume.dto.UserInfo;
 import com.example.resume.entity.User;
+import com.example.resume.entity.UserMeta;
+import com.example.resume.entity.UserProfileDetails;
 import com.example.resume.entity.VerificationToken;
 import com.example.resume.enums.Role;
+import com.example.resume.repository.UserDetailRepository;
 import com.example.resume.repository.UserRepository;
 import com.example.resume.repository.VerificationTokenRepository;
 import com.example.resume.utils.GoogleTokenVerifier;
 import com.example.resume.utils.JwtUtil;
+import com.example.resume.utils.UserMetaExtractor;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -49,14 +54,18 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private UserMetaExtractor userMetaExtractor;
+
     @Autowired
     private GoogleTokenVerifier googleTokenVerifier;
+    @Autowired
+    private UserDetailRepository userDetailRepository;
 
     public ApiResponse<AuthResponse> register(RegisterRequest request){
         try {
 
-            // check if the user already exists
-            // 1. Check if username already exists
             if (userService.existsByUsername(request.getUserName())) {
                 return ApiResponse.<AuthResponse>builder()
                         .status("failed")
@@ -65,7 +74,6 @@ public class AuthService {
                         .build();
             }
 
-            // 2. Check if email already exists
             if (userService.existsByEmail(request.getEmail())) {
                 return ApiResponse.<AuthResponse>builder()
                         .status("failed")
@@ -74,7 +82,6 @@ public class AuthService {
                         .build();
             }
 
-            // if verify then save data to the database
             User newUser = new User();
             newUser.setUserName(request.getUserName());
             newUser.setEmail(request.getEmail());
@@ -86,11 +93,9 @@ public class AuthService {
 
             userService.save(newUser);
 
-            // return the response
             String accessToken = jwtUtil.generateAccessToken(newUser.getUserName());
             String refreshToken = jwtUtil.generateRefreshToken(newUser.getUserName());
 
-            // Create Token and Save to the Database;
             String token = UUID.randomUUID().toString();
             VerificationToken verifyToken = VerificationToken.builder()
                     .token(token)
@@ -101,7 +106,6 @@ public class AuthService {
 
             verificationTokenRepository.save(verifyToken);
 
-            // send email
             emailService.sendVerificationEmail(newUser.getEmail(), token);
 
             log.info("User registered successfully: {}", request.getUserName());
@@ -167,7 +171,7 @@ public class AuthService {
         }
     }
 
-    public ApiResponse<AuthResponse> login(LoginRequest request){
+    public ApiResponse<AuthResponse> login(LoginRequest request, HttpServletRequest httpServletRequest){
 
 
         try {
@@ -205,6 +209,8 @@ public class AuthService {
                     .user(userInfo)
                     .build();
 
+            updateUserMeta(user, httpServletRequest);
+
             return ApiResponse.<AuthResponse>builder()
                     .status("success")
                     .message("Login Successful")
@@ -219,6 +225,17 @@ public class AuthService {
                     .data(null)
                     .build();
         }
+    }
+
+    private void updateUserMeta(User user, HttpServletRequest request){
+        UserProfileDetails userProfileDetails = userDetailRepository.findByUser(user);
+        if(userProfileDetails == null) return;
+
+        UserMeta userMeta = userMetaExtractor.extract(request);
+        userProfileDetails.setUserMeta(userMeta);
+        userDetailRepository.save(userProfileDetails);
+        userProfileDetails.setUserIp(userMeta.getLastLoginIp());
+        log.info("UserMeta updated for user: {} from IP: {}", user.getUserName(), userMeta.getLastLoginIp());
     }
 
     public void logout(){
@@ -331,10 +348,5 @@ public class AuthService {
         }
         return username;
     }
-
-
-
-
-
 
 }

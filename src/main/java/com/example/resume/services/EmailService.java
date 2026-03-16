@@ -34,4 +34,6 @@ public class EmailService {
         log.info("Verification email sent to {}", toEmail);
     }
 
+    // Write Some Email Function
+
 }
