@@ -33,18 +33,23 @@ public class AuthController {
         return authService.login(loginRequest, request);
     }
 
+    @PostMapping("/{username}/logout")
+    public ApiResponse<Void> logout(@PathVariable String username, HttpServletRequest request) {
+        return authService.logout(username, request);
+    }
+
     @PostMapping("/refresh")
     public ApiResponse<AuthResponse> refreshToken(@RequestBody String token) {
         return authService.refreshToken(token);
     }
 
     @PostMapping("/google")
-    public ApiResponse<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request){
+    public ApiResponse<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request) {
         return authService.googleLogin(request);
     }
 
     @GetMapping("/test")
-    private ResponseEntity<String> test(){
+    private ResponseEntity<String> test() {
         return ResponseEntity.ok("Hello world Sniper");
     }
 }

@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -60,8 +61,12 @@ public class AuthService {
 
     @Autowired
     private GoogleTokenVerifier googleTokenVerifier;
+
     @Autowired
     private UserDetailRepository userDetailRepository;
+
+    @Autowired
+    private JwtService jwtService;
 
     public ApiResponse<AuthResponse> register(RegisterRequest request){
         try {
@@ -238,10 +243,6 @@ public class AuthService {
         log.info("UserMeta updated for user: {} from IP: {}", user.getUserName(), userMeta.getLastLoginIp());
     }
 
-    public void logout(){
-
-    }
-
     public ApiResponse<AuthResponse> refreshToken(String token) {
         String username = jwtUtil.extractUsername(token);
 
@@ -348,5 +349,28 @@ public class AuthService {
         }
         return username;
     }
+
+    public ApiResponse<Void> logout(String username, HttpServletRequest request) {
+        User user = userRepository.findByUserName(username);
+        if (user == null) {
+            throw new UsernameNotFoundException("User not found: " + username);
+        }
+
+        // Invalidate the JWT token
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            jwtService.blacklistToken(token);       // blacklist the token
+        }
+
+        log.info("User logged out: {}", username);
+
+        return ApiResponse.<Void>builder()
+                .status("success")
+                .message("Logged out successfully")
+                .data(null)
+                .build();
+    }
+
 
 }
