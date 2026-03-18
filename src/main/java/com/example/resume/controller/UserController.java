@@ -1,5 +1,6 @@
 package com.example.resume.controller;
 
+import com.example.resume.dto.Request.ChangePasswordRequest;
 import com.example.resume.dto.Request.UpdateProfileRequest;
 import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.entity.User;
@@ -44,5 +45,9 @@ public class UserController {
         return userService.getUserProfile(username);
     }
 
+    @PostMapping("/{username}/changePassword")
+    public ApiResponse<User> changePassword(@PathVariable String username, @RequestBody ChangePasswordRequest request) {
+        return userService.changePassword(username, request);
+    }
 
 }

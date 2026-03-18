@@ -360,7 +360,7 @@ public class AuthService {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            jwtService.blacklistToken(token);       // blacklist the token
+            jwtService.blacklistToken(token);
         }
 
         log.info("User logged out: {}", username);
