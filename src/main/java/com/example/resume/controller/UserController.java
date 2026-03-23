@@ -6,8 +6,11 @@ import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.entity.User;
 import com.example.resume.entity.UserProfileDetails;
 import com.example.resume.services.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+@Tag(name = "Users", description = "Endpoints for managing users functions")
 
 @RestController
 @RequestMapping("/api/v1/user")

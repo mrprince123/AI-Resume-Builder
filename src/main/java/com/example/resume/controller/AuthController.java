@@ -6,11 +6,13 @@ import com.example.resume.dto.Request.RegisterRequest;
 import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.dto.Response.AuthResponse;
 import com.example.resume.services.AuthService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Auth", description = "Endpoints for managing all auth functions")
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {

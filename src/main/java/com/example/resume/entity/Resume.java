@@ -1,5 +1,7 @@
 package com.example.resume.entity;
 
+import com.example.resume.converter.ContentConverter;
+import com.example.resume.entity.payload.ResumeContent;
 import com.example.resume.enums.Domain;
 import com.example.resume.enums.FileFormat;
 import com.example.resume.enums.ResumeStatus;
@@ -31,23 +33,9 @@ public class Resume {
     @Column(name = "job_description", columnDefinition = "LONGTEXT")
     private String jobDescription;
 
-    private String content;
-
     @Convert(converter = ContentConverter.class)
     @Column(name = "content", columnDefinition = "JSON")
     private ResumeContent content;
-
-
-    // ResumeContent.java
-    public class ResumeContent {
-        private String summary;
-        private List<String> skills;
-        private List<String> experience;
-        private List<String> education;
-        private List<String> keywords;
-        // getters and setters
-    }
-
 
     @Column(name = "file_format", columnDefinition = "VARCHAR(20) DEFAULT 'PDF'")
     private FileFormat format = FileFormat.PDF;
