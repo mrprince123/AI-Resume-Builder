@@ -3,6 +3,7 @@ package com.example.resume.services;
 import com.example.resume.dto.Request.TemplateRequest;
 import com.example.resume.dto.Response.ApiResponse;
 import com.example.resume.entity.Template;
+import com.example.resume.entity.payload.ResumeContent;
 import com.example.resume.repository.TemplateRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -138,6 +139,49 @@ public class TemplateService {
     // render template - inject ResumeContent JSON into
     //                                HTML template and return
     //                                rendered HTML string
+
+    // TemplateService.java
+
+    public String renderTemplate(Template template, ResumeContent content) {
+        try {
+            // 1. get the raw HTML from template
+            String html = template.getHtmlContents();
+
+            if (html == null || html.isBlank()) {
+                throw new RuntimeException("Template HTML content is empty, id: " + template.getId());
+            }
+
+            // 2. replace placeholders with actual content
+            html = html.replace("{{summary}}", content.getSummary());
+            html = html.replace("{{skills}}", formatList(content.getSkills()));
+            html = html.replace("{{experience}}", formatList(content.getExperience()));
+            html = html.replace("{{education}}", formatList(content.getEducation()));
+            html = html.replace("{{keywords}}", formatList(content.getKeywords()));
+
+            log.info("Template rendered successfully, id: {}", template.getId());
+
+            return html;
+
+        } catch (Exception e) {
+            log.error("Template rendering failed, id: {}, error: {}",
+                    template.getId(), e.getMessage());
+            throw new RuntimeException("Template rendering failed: " + e.getMessage());
+        }
+    }
+
+    // convert List<String> into HTML list items
+    private String formatList(List<String> items) {
+
+        if (items == null || items.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (String item : items) {
+            sb.append("<li>").append(item).append("</li>");
+        }
+        return sb.toString();
+    }
 
 
 }
