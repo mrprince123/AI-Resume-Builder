@@ -135,23 +135,14 @@ public class TemplateService {
                 .build();
     }
 
-
-    // render template - inject ResumeContent JSON into
-    //                                HTML template and return
-    //                                rendered HTML string
-
-    // TemplateService.java
-
     public String renderTemplate(Template template, ResumeContent content) {
         try {
-            // 1. get the raw HTML from template
             String html = template.getHtmlContents();
 
             if (html == null || html.isBlank()) {
                 throw new RuntimeException("Template HTML content is empty, id: " + template.getId());
             }
 
-            // 2. replace placeholders with actual content
             html = html.replace("{{summary}}", content.getSummary());
             html = html.replace("{{skills}}", formatList(content.getSkills()));
             html = html.replace("{{experience}}", formatList(content.getExperience()));
@@ -169,7 +160,6 @@ public class TemplateService {
         }
     }
 
-    // convert List<String> into HTML list items
     private String formatList(List<String> items) {
 
         if (items == null || items.isEmpty()) {
@@ -182,6 +172,4 @@ public class TemplateService {
         }
         return sb.toString();
     }
-
-
 }

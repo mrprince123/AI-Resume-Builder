@@ -18,34 +18,26 @@ public class AIService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // main function called by ResumeService
     public ResumeContent analyseJobDescription(Domain domain, String jobDescription) {
-
-        // 1. call Gemini and get raw response
         String rawResponse = analyseResumeContents(domain, jobDescription);
         log.info("Raw AI response received for domain: {}", domain);
 
-        // 2. parse raw response into ResumeContent
         ResumeContent content = parseAIResponse(rawResponse);
 
-        // 3. validate the parsed content
         validateAIResponse(content);
 
         return content;
     }
 
-    // send prompt to Gemini and get raw string back
     private String analyseResumeContents(Domain domain, String jobDescription) {
 
-        // initialize client
         Client client = new Client.Builder()
                 .apiKey(apiKey)
                 .build();
 
-        // build prompt
+
         String prompt = buildPrompt(domain, jobDescription);
 
-        // send to Gemini
         GenerateContentResponse response = client.models
                 .generateContent("gemini-2.0-flash", prompt, null);
 
@@ -54,7 +46,6 @@ public class AIService {
         return response.text();
     }
 
-    // build the prompt string to send to Gemini
     private String buildPrompt(Domain domain, String jobDescription) {
         return """
                 You are an expert resume writer with 10+ years of experience
@@ -95,10 +86,7 @@ public class AIService {
                 """.formatted(domain, domain, jobDescription);
     }
 
-    // parse raw Gemini response string into ResumeContent object
     private ResumeContent parseAIResponse(String rawResponse) {
-
-        // strip markdown backticks if Gemini adds them
         String cleaned = rawResponse
                 .replace("```json", "")
                 .replace("```", "")
@@ -112,7 +100,6 @@ public class AIService {
         }
     }
 
-    // validate that all required fields are present in parsed content
     private void validateAIResponse(ResumeContent content) {
 
         if (content == null) {

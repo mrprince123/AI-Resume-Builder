@@ -38,6 +38,9 @@ public class ResumeService {
     @Autowired
     private TemplateService templateService;
 
+    @Autowired
+    private FileService fileService;
+
     // create
     public ApiResponse<ResumeResponse> create(ResumeRequest request, User user) {
 
@@ -182,11 +185,22 @@ public class ResumeService {
         resumeRepository.save(resume);
         log.info("Resume reset to PENDING for regeneration, id: {}", resumeId);
 
-        // trigger generation pipeline again
-        GenerateResumeResult result = generateResume(resume);
+        generateResume(resume);
+        log.info("Resume generated successfully, id: {}", resume.getId());
 
         // build and return response
-        ResumeResponse resumeResponse = mapToResponse(resume);
+        ResumeResponse resumeResponse = ResumeResponse.builder()
+                .id(resume.getId())
+                .domain(resume.getDomain())
+                .jobDescription(resume.getJobDescription())
+                .format(resume.getFormat())
+                .status(resume.getResumeStatus())
+                .content(resume.getContent())
+                .fileUrl(resume.getFileUrl())
+                .createdAt(resume.getCreatedAt())
+                .updatedAt(resume.getUpdatedAt())
+                .build();
+
         return ApiResponse.<ResumeResponse>builder()
                 .status("success")
                 .message("Resume regenerated successfully")
