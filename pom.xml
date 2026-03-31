@@ -6,7 +6,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.1.0-SNAPSHOT</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/>
     </parent>
     <groupId>com.example</groupId>
     <artifactId>resume</artifactId>
@@ -43,7 +43,20 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
+        <!-- Source: https://mvnrepository.com/artifact/com.ironsoftware/ironpdf -->
+        <dependency>
+            <groupId>com.ironsoftware</groupId>
+            <artifactId>ironpdf</artifactId>
+            <version>2026.3.1</version>
+            <scope>compile</scope>
+        </dependency>
 
+        <dependency>
+            <groupId>com.aspose</groupId>
+            <artifactId>aspose-words</artifactId>
+            <version>24.10</version> <!-- Replace with desired version -->
+            <classifier>jdk17</classifier> <!-- Use jdk17, jdk11, or jdk8 -->
+        </dependency>
 
         <!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-mail -->
         <dependency>
@@ -167,6 +180,13 @@
                 <enabled>false</enabled>
             </releases>
         </repository>
+
+        <repository>
+            <id>AsposeJavaAPI</id>
+            <name>Aspose Java API</name>
+            <url>https://releases.aspose.com/java/repo/</url>
+        </repository>
+
     </repositories>
     <pluginRepositories>
         <pluginRepository>

@@ -1,110 +1,164 @@
 package com.example.resume.services;
 
+import com.aspose.words.LoadFormat;
+import com.aspose.words.LoadOptions;
+import com.aspose.words.SaveFormat;
 import com.example.resume.enums.FileFormat;
 import com.example.resume.security.SecurityHelper;
+import com.ironsoftware.ironpdf.PdfDocument;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
+import com.aspose.words.Document;
+
 @Service
 public class FileService {
+
+    private static final Logger log = LoggerFactory.getLogger(FileService.class);
 
     @Autowired
     private SecurityHelper securityHelper;
 
-
     public String contentToFile(String htmlResumeContent, FileFormat format, Long resumeId) {
-        format = FileFormat.PDF;
 
-        generate_pdf(htmlResumeContent);
-        generateFile_name(resumeId, format);
+        if (htmlResumeContent == null || htmlResumeContent.isBlank()) {
+            throw new RuntimeException("HTML content is null or empty");
+        }
 
-        return "file_url";
+        String fileName = generateFileName(resumeId, format);
+
+        byte[] fileBytes;
+        if (format == FileFormat.PDF) {
+            fileBytes = generatePdf(htmlResumeContent);
+        } else {
+            fileBytes = generateDocx(htmlResumeContent);
+        }
+
+        try {
+            return saveFile(fileBytes, fileName);
+        } catch (IOException e) {
+            log.error("Failed to save file for resume id: {}", resumeId);
+            throw new RuntimeException("Failed to save file: " + e.getMessage());
+        }
     }
 
-    // take the html and convert this into the pdf file
-    public byte[] generate_pdf(String htmlContent) {
+    public byte[] generatePdf(String htmlContent) {
+        try {
+            PdfDocument pdf = PdfDocument.renderHtmlAsPdf(htmlContent);
+
+            byte[] file = pdf.getBinaryData();
+
+            log.info("PDF created successfully");
+
+            return file;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    // take the formatted html and convert this into the docx
-    public byte[] generateDocx(String html) {
-        return "";
+    public byte[] generateDocx(String htmlContent) {
+        try {
+            LoadOptions loadOptions = new LoadOptions();
+            loadOptions.setLoadFormat(LoadFormat.HTML);
+
+            Document doc = new Document(
+                    new ByteArrayInputStream(htmlContent.getBytes()),
+                    loadOptions);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            doc.save(outputStream, SaveFormat.DOCX);
+
+            byte[] file = outputStream.toByteArray();
+
+            log.info("DOCX created successfully");
+
+            return file;
+
+        } catch (Exception e) {
+            log.error("DOCX generation failed: {}", e.getMessage());
+            throw new RuntimeException("DOCX generation failed: " + e.getMessage());
+        }
     }
 
-    public String saveFile(String fileContents, String fileName) {
-        // db action
+    public String saveFile(byte[] fileContents, String fileName) throws IOException {
+
+        String storeDirectory = "/uploads/resumes";
+
+        File directory = new File(storeDirectory);
+        if (!directory.exists()) {
+            directory.mkdirs();
+            log.info("File Directory created successfully: {}", directory);
+        }
+
+        String filePath = storeDirectory + "/" + fileName;
+
+        Files.write(Paths.get(filePath), fileContents);
+
+        log.info("File saved successfully: {}", filePath);
+
+        return filePath;
+
     }
 
-    public String deleteFile(String file_url) {
-        // delete file from db
+    public void deleteFile(String filePath) throws IOException {
+        if (filePath == null || filePath.isBlank()) {
+            log.warn("File path is null or empty, skipping delete");
+            return;
+        }
 
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path)) {
+            log.warn("File not found, skipping delete: {}", filePath);
+            return;
+        }
+
+        Files.delete(path);
+
+        log.info("File deleted successfully: {}", filePath);
     }
 
-    public String generateFile_name(Long resumeId, FileFormat format) {
-        Long userId  = securityHelper.getAuthenticatedUserId();
+    public String generateFileName(Long resumeId, FileFormat format) {
+        Long userId = securityHelper.getAuthenticatedUserId();
 
         String timestamp = DateTimeFormatter
                 .ofPattern("yyyyMMdd_HHmmss")
                 .withZone(ZoneId.systemDefault())
                 .format(Instant.now());
 
-        String file_name = "resume_" + userId + "_" + resumeId + "_" + timestamp + "." + format;
-
-        return file_name;
+        return "resume_" + userId + "_" + resumeId + "_" + timestamp + "." + format;
     }
 
+    public byte[] getFile(String filePath) throws IOException {
+        if (filePath == null || filePath.isBlank()) {
+            log.error("File path is null or empty");
+            throw new RuntimeException("File path is null or empty");
+        }
 
-    public String getFile(String file_url) {
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path)) {
+            log.error("File not found: {}", filePath);
+            throw new RuntimeException("File not found: " + filePath);
+        }
+
+        byte[] fileBytes = Files.readAllBytes(path);
+
+        log.info("File retrieved successfully: {}", filePath);
+
+        return fileBytes;
 
     }
-
 
 }
-
-
-//FileService
-//a. contentToFile          → main function, takes rendered HTML + format + resumeId
-//converts to PDF or DOCX based on format enum
-//calls either generatePdf or generateDocx internally
-//                returns file_url
-//
-//                b. generatePdf            → takes rendered HTML string,
-//converts it to PDF file,
-//returns saved file path
-//
-//c. generateDocx           → takes rendered HTML string,
-//converts it to DOCX file,
-//returns saved file path
-//
-//d. saveFile               → takes generated file (bytes) + filename,
-//saves to disk or cloud storage,
-//returns file_url string
-//
-//e. deleteFile             → takes file_url,
-//deletes file from disk or cloud storage,
-//called when resume is deleted
-//
-//f. generateFileName       → generates a unique filename
-//e.g. resume_userId_resumeId_timestamp.pdf
-//keeps filenames unique and traceable
-//
-//g. getFile                → takes file_url,
-//reads and returns file as byte array,
-//used by downloadResume endpoint
-//```
-//
-//        ---
-//
-//        **The flow between them:**
-//        ```
-//contentToFile(renderedHtml, format, resumeId)
-//        ↓
-//generateFileName(userId, resumeId, format)
-//        ↓ returns "resume_1_23_1234567890.pdf"
-//generatePdf or generateDocx (based on format)
-//        ↓ returns file as byte[]
-//saveFile(fileBytes, fileName)
-//        ↓ saves to disk or cloud
-//return file_url

@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -358,8 +359,21 @@ public class ResumeService {
     }
 
     // delete resume
-    public ApiResponse<Void> deleteResume(Long id){
+    public ApiResponse<Void> deleteResume(Long id, User user) throws IOException {
         Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
+
+        if (!resume.getUser().getId().equals(user.getId())) {
+            return ApiResponse.<Void>builder()
+                    .status("failed")
+                    .message("Unauthorized access to resume: " + id)
+                    .data(null)
+                    .build();
+        }
+
+        if (resume.getFileUrl() != null) {
+            fileService.deleteFile(resume.getFileUrl());
+        }
+
         resumeRepository.delete(resume);
 
         log.info("Resume deleted successfully, by provided id: {}", resume.getId());
@@ -419,7 +433,6 @@ public class ResumeService {
     public ApiResponse<String> downloadResume(Long id){
         Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
 
-        // call the file service and pass the resume to download
         log.info("Resume downloaded successfully, by provided id: {}", resume.getId());
 
         return ApiResponse.<String>builder()
@@ -427,8 +440,5 @@ public class ResumeService {
                 .message("Resumes downloaded successfully with provided id"+ id)
                 .data("www.goog.eom")
                 .build();
-
-
-        // give the ApiResponse as return
     }
 }
