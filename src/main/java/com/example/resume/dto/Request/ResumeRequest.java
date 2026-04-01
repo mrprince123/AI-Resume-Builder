@@ -18,7 +18,7 @@ public class ResumeRequest {
     private String jobDescription;
 
     @NotNull(message = "Template is required")
-    private Template templateId;
+    private Long templateId;
 
     private FileFormat format;
 }

@@ -11,6 +11,7 @@ import com.example.resume.entity.payload.ResumeContent;
 import com.example.resume.enums.ResumeStatus;
 import com.example.resume.repository.ResumeRepository;
 import com.example.resume.repository.TemplateRepository;
+import com.example.resume.repository.UserRepository;
 import com.example.resume.security.SecurityHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,9 @@ public class ResumeService {
     private TemplateRepository templateRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private SecurityHelper securityHelper;
 
     @Autowired
@@ -43,15 +47,20 @@ public class ResumeService {
     private FileService fileService;
 
     // create
-    public ApiResponse<ResumeResponse> create(ResumeRequest request, User user) {
+    public ApiResponse<ResumeResponse> create(ResumeRequest request) {
 
         // 1. validate - check template exists
-        Template template = templateRepository.findByTemplateId(request.getTemplateId()).orElseThrow(() -> new RuntimeException("Template not found: " + request.getTemplateId()));
+        Template template = templateRepository.findById(request.getTemplateId()).orElseThrow(() -> new RuntimeException("Template not found: " + request.getTemplateId()));
+
+        Long userId = securityHelper.getAuthenticatedUserId();
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
         // 2. check delicacy - same domain + job description already exists for this user
         Resume existingResume = resumeRepository
                 .findByUserIdAndDomainAndJobDescription(
-                        user.getId(),
+                        userId,
                         request.getDomain(),
                         request.getJobDescription()
                 );
@@ -114,7 +123,7 @@ public class ResumeService {
     }
 
     // generate resume - performs the full AI pipeline
-    private void generateResume(Resume resume){
+    public void generateResume(Resume resume){
         try {
             // 1. send job description to Gemini → get structured JSON back
             log.info("Starting AI analysis for resume id: {}", resume.getId());
@@ -161,14 +170,16 @@ public class ResumeService {
     }
 
     // re-generate resume
-    public ApiResponse<ResumeResponse> regenerateResume(Long resumeId, User user) {
+    public ApiResponse<ResumeResponse> regenerateResume(Long resumeId) {
 
         // find resume
         Resume resume = resumeRepository.findById(resumeId)
                 .orElseThrow(() -> new RuntimeException("Resume not found: " + resumeId));
 
+        Long userId = securityHelper.getAuthenticatedUserId();
+
         // check it belongs to this user
-        if (!resume.getUser().getId().equals(user.getId())) {
+        if (!resume.getUser().getId().equals(userId)) {
             throw new RuntimeException("Unauthorized access to resume: " + resumeId);
         }
 
@@ -275,7 +286,7 @@ public class ResumeService {
 
         Long userId  = securityHelper.getAuthenticatedUserId();
 
-        List<Resume> resumes = resumeRepository.findMyResume(userId);
+        List<Resume> resumes = resumeRepository.findByUserId(userId);
 
         // map Resume entity → ResumeResponse
         List<ResumeResponse> resumeResponses = resumes.stream()
@@ -331,7 +342,7 @@ public class ResumeService {
     // get resume by Status
     public ApiResponse<List<ResumeResponse>> getResumeByStatus(ResumeStatus status){
 
-        List<Resume> resumes = resumeRepository.findByStatus(status);
+        List<Resume> resumes = resumeRepository.findByResumeStatus(status);
 
         // map Resume entity → ResumeResponse
         List<ResumeResponse> resumeResponses = resumes.stream()
@@ -359,10 +370,12 @@ public class ResumeService {
     }
 
     // delete resume
-    public ApiResponse<Void> deleteResume(Long id, User user) throws IOException {
+    public ApiResponse<Void> deleteResume(Long id) throws IOException {
         Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
 
-        if (!resume.getUser().getId().equals(user.getId())) {
+        Long userId = securityHelper.getAuthenticatedUserId();
+
+        if (!resume.getUser().getId().equals(userId)) {
             return ApiResponse.<Void>builder()
                     .status("failed")
                     .message("Unauthorized access to resume: " + id)

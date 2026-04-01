@@ -10,11 +10,11 @@ import java.util.List;
 
 public interface ResumeRepository extends JpaRepository<Resume, Long> {
 
-    List<Resume> findMyResume(Long userId);
+    List<Resume> findByUserId(Long userId);
 
     List<Resume> findResumeByUser(User user);
 
-    List<Resume> findByStatus(ResumeStatus status);
+    List<Resume> findByResumeStatus(ResumeStatus status);
 
     Resume findByUserIdAndDomainAndJobDescription(Long userId, Domain Domain, String JobDescription);
 }

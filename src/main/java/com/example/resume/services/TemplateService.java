@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -26,7 +27,7 @@ public class TemplateService {
         // find if the template with the same name already exits
         if (templateExists != null) {
             return ApiResponse.<String>builder()
-                    .status("failed")
+                    .status("404")
                     .message("Template with this name already exits")
                     .data(null)
                     .build();
@@ -43,11 +44,10 @@ public class TemplateService {
 
         // return the response.
         return ApiResponse.<String>builder()
-                .status("success")
+                .status("200")
                 .message("Template created successfully")
                 .data(template.getName())
                 .build();
-
     }
 
     // delete template
@@ -172,4 +172,6 @@ public class TemplateService {
         }
         return sb.toString();
     }
+
+
 }
