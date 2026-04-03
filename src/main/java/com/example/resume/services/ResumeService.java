@@ -13,13 +13,15 @@ import com.example.resume.repository.ResumeRepository;
 import com.example.resume.repository.TemplateRepository;
 import com.example.resume.repository.UserRepository;
 import com.example.resume.security.SecurityHelper;
+import jakarta.security.auth.message.AuthException;
+import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -47,7 +49,8 @@ public class ResumeService {
     private FileService fileService;
 
     // create
-    public ApiResponse<ResumeResponse> create(ResumeRequest request) {
+    @Transactional
+    public ResumeResponse create(ResumeRequest request) {
 
         // 1. validate - check template exists
         Template template = templateRepository.findById(request.getTemplateId()).orElseThrow(() -> new RuntimeException("Template not found: " + request.getTemplateId()));
@@ -66,11 +69,7 @@ public class ResumeService {
                 );
 
         if (existingResume != null) {
-            return ApiResponse.<ResumeResponse>builder()
-                    .status("failed")
-                    .message("Resume with the same job description already exists")
-                    .data(null)
-                    .build();
+            throw new RuntimeException("Resume with the same job description already exists");
         }
 
         // 3. save initial record in DB with PENDING status
@@ -95,34 +94,16 @@ public class ResumeService {
         } catch (Exception e) {
             log.error("Resume generation failed, id: {}, error: {}",
                     resume.getId(), e.getMessage());
-            return ApiResponse.<ResumeResponse>builder()
-                    .status("failed")
-                    .message("Resume generation failed, please try again")
-                    .data(null)
-                    .build();
+
+            throw new RuntimeException("Resume generation failed");
         }
 
-        // 5. build and return response
-        ResumeResponse resumeResponse = ResumeResponse.builder()
-                .id(resume.getId())
-                .domain(resume.getDomain())
-                .jobDescription(resume.getJobDescription())
-                .format(resume.getFormat())
-                .status(resume.getResumeStatus())
-                .content(resume.getContent())
-                .fileUrl(resume.getFileUrl())
-                .createdAt(resume.getCreatedAt())
-                .updatedAt(resume.getUpdatedAt())
-                .build();
-
-        return ApiResponse.<ResumeResponse>builder()
-                .status("success")
-                .message("Resume created successfully")
-                .data(resumeResponse)
-                .build();
+        return mapToResponse(resume);
     }
 
     // generate resume - performs the full AI pipeline
+    @Async
+    @Transactional
     public void generateResume(Resume resume){
         try {
             // 1. send job description to Gemini → get structured JSON back
@@ -170,7 +151,8 @@ public class ResumeService {
     }
 
     // re-generate resume
-    public ApiResponse<ResumeResponse> regenerateResume(Long resumeId) {
+    @Transactional
+    public ResumeResponse regenerateResume(Long resumeId) {
 
         // find resume
         Resume resume = resumeRepository.findById(resumeId)
@@ -185,11 +167,7 @@ public class ResumeService {
 
         // check status is FAILED
         if (resume.getResumeStatus() != ResumeStatus.FAILED) {
-            return ApiResponse.<ResumeResponse>builder()
-                    .status("failed")
-                    .message("Only failed resumes can be regenerated")
-                    .data(null)
-                    .build();
+            throw new RuntimeException("Only failed resumes can be regenerated");
         }
 
         // reset to PENDING
@@ -198,91 +176,47 @@ public class ResumeService {
         log.info("Resume reset to PENDING for regeneration, id: {}", resumeId);
 
         generateResume(resume);
+
         log.info("Resume generated successfully, id: {}", resume.getId());
 
-        // build and return response
-        ResumeResponse resumeResponse = ResumeResponse.builder()
-                .id(resume.getId())
-                .domain(resume.getDomain())
-                .jobDescription(resume.getJobDescription())
-                .format(resume.getFormat())
-                .status(resume.getResumeStatus())
-                .content(resume.getContent())
-                .fileUrl(resume.getFileUrl())
-                .createdAt(resume.getCreatedAt())
-                .updatedAt(resume.getUpdatedAt())
-                .build();
-
-        return ApiResponse.<ResumeResponse>builder()
-                .status("success")
-                .message("Resume regenerated successfully")
-                .data(resumeResponse)
-                .build();
+        return mapToResponse(resume);
     }
 
     // get all resume
-    public ApiResponse<List<ResumeResponse>> getAllResume(){
+    public List<ResumeResponse> getAllResume(){
 
         List<Resume> resumes = resumeRepository.findAll();
 
         // map Resume entity → ResumeResponse
         List<ResumeResponse> resumeResponses = resumes.stream()
-                .map(resume -> ResumeResponse.builder()
-                        .id(resume.getId())
-                        .domain(resume.getDomain())
-                        .jobDescription(resume.getJobDescription())
-                        .format(resume.getFormat())
-                        .status(resume.getResumeStatus())
-                        .content(resume.getContent())
-                        .fileUrl(resume.getFileUrl())
-                        .createdAt(resume.getCreatedAt())
-                        .updatedAt(resume.getUpdatedAt())
-                        .build()
-                )
-                .collect(Collectors.toList());
+                .map(this::mapToResponse)
+                .toList();
 
         log.info("All resumes fetched successfully, count: {}", resumeResponses.size());
 
-
-        return ApiResponse.<List<ResumeResponse>>builder()
-                .status("success")
-                .message("All Resumes fetched successfully")
-                .data(resumeResponses)
-                .build();
+        return resumeResponses;
     }
 
     // get all resume by User id
-    public ApiResponse<List<ResumeResponse>> getAllResumeByUser(User user){
+    public List<ResumeResponse> getAllResumeByUser(Long userId){
+
+        // here you want find the user from the userId
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found with provided " + userId));
 
         List<Resume> resumes = resumeRepository.findResumeByUser(user);
 
         // map Resume entity → ResumeResponse
         List<ResumeResponse> resumeResponses = resumes.stream()
-                .map(resume -> ResumeResponse.builder()
-                        .id(resume.getId())
-                        .domain(resume.getDomain())
-                        .jobDescription(resume.getJobDescription())
-                        .format(resume.getFormat())
-                        .status(resume.getResumeStatus())
-                        .content(resume.getContent())
-                        .fileUrl(resume.getFileUrl())
-                        .createdAt(resume.getCreatedAt())
-                        .updatedAt(resume.getUpdatedAt())
-                        .build()
-                )
-                .collect(Collectors.toList());
+                .map(this::mapToResponse)
+                .toList();
 
         log.info("All resumes fetched successfully, count: {}", resumeResponses.size());
 
-        return ApiResponse.<List<ResumeResponse>>builder()
-                .status("success")
-                .message("All Resumes fetched successfully by user " + user)
-                .data(resumeResponses)
-                .build();
+        return resumeResponses;
     }
 
     // get my resume
-    public ApiResponse<List<ResumeResponse>> getMyResumes(){
+    public List<ResumeResponse> getMyResumes(){
 
         Long userId  = securityHelper.getAuthenticatedUserId();
 
@@ -290,117 +224,72 @@ public class ResumeService {
 
         // map Resume entity → ResumeResponse
         List<ResumeResponse> resumeResponses = resumes.stream()
-                .map(resume -> ResumeResponse.builder()
-                        .id(resume.getId())
-                        .domain(resume.getDomain())
-                        .jobDescription(resume.getJobDescription())
-                        .format(resume.getFormat())
-                        .status(resume.getResumeStatus())
-                        .content(resume.getContent())
-                        .fileUrl(resume.getFileUrl())
-                        .createdAt(resume.getCreatedAt())
-                        .updatedAt(resume.getUpdatedAt())
-                        .build()
-                )
-                .collect(Collectors.toList());
+                .map(this::mapToResponse)
+                .toList();
 
         log.info("All resumes fetched successfully, count: {}", resumeResponses.size());
 
-        return ApiResponse.<List<ResumeResponse>>builder()
-                .status("success")
-                .message("All My Resumes fetched successfully")
-                .data(resumeResponses)
-                .build();
+        return resumeResponses;
     }
 
     // get resume by resumeId
-    public ApiResponse<ResumeResponse> getResumeById(Long id){
-
+    public ResumeResponse getResumeById(Long id){
         Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
-
-        ResumeResponse resumeResponse = ResumeResponse.builder()
-                .id(resume.getId())
-                .domain(resume.getDomain())
-                .jobDescription(resume.getJobDescription())
-                .format(resume.getFormat())
-                .status(resume.getResumeStatus())
-                .content(resume.getContent())
-                .fileUrl(resume.getFileUrl())
-                .createdAt(resume.getCreatedAt())
-                .updatedAt(resume.getUpdatedAt())
-                .build();
 
         log.info("Resume fetched successfully, by provided id: {}", resume.getId());
 
-        return ApiResponse.<ResumeResponse>builder()
-                .status("success")
-                .message("Resumes fetched successfully by provided id " +  id)
-                .data(resumeResponse)
-                .build();
+        return mapToResponse(resume);
     }
 
     // get resume by Status
-    public ApiResponse<List<ResumeResponse>> getResumeByStatus(ResumeStatus status){
+    public List<ResumeResponse> getResumeByStatus(ResumeStatus status){
 
         List<Resume> resumes = resumeRepository.findByResumeStatus(status);
 
         // map Resume entity → ResumeResponse
         List<ResumeResponse> resumeResponses = resumes.stream()
-                .map(resume -> ResumeResponse.builder()
-                        .id(resume.getId())
-                        .domain(resume.getDomain())
-                        .jobDescription(resume.getJobDescription())
-                        .format(resume.getFormat())
-                        .status(resume.getResumeStatus())
-                        .content(resume.getContent())
-                        .fileUrl(resume.getFileUrl())
-                        .createdAt(resume.getCreatedAt())
-                        .updatedAt(resume.getUpdatedAt())
-                        .build()
-                )
-                .collect(Collectors.toList());
+                .map(this::mapToResponse)
+                .toList();
 
         log.info("All resumes fetched successfully, count: {}", resumeResponses.size());
 
-        return ApiResponse.<List<ResumeResponse>>builder()
-                .status("success")
-                .message("All Resumes fetched successfully by status " + status)
-                .data(resumeResponses)
-                .build();
+        return resumeResponses;
     }
 
     // delete resume
-    public ApiResponse<Void> deleteResume(Long id) throws IOException {
+    public void deleteResume(Long id) throws IOException {
         Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
 
         Long userId = securityHelper.getAuthenticatedUserId();
 
         if (!resume.getUser().getId().equals(userId)) {
-            return ApiResponse.<Void>builder()
-                    .status("failed")
-                    .message("Unauthorized access to resume: " + id)
-                    .data(null)
-                    .build();
-        }
-
-        if (resume.getFileUrl() != null) {
-            fileService.deleteFile(resume.getFileUrl());
+            throw new RuntimeException("Unauthorized access to resume: " + id);
         }
 
         resumeRepository.delete(resume);
 
-        log.info("Resume deleted successfully, by provided id: {}", resume.getId());
+        // Then delete file (best effort)
+        if (resume.getFileUrl() != null) {
+            try {
+                fileService.deleteFile(resume.getFileUrl());
+            } catch (Exception e) {
+                log.error("File deletion failed for resume id: {}, error: {}", id, e.getMessage());
+            }
+        }
 
-        return ApiResponse.<Void>builder()
-                .status("success")
-                .message("Resumes deleted successfully with provided id"+ id)
-                .data(null)
-                .build();
+        log.info("Resume deleted successfully, by provided id: {}", resume.getId());
     }
 
     // update resume (edit resume)
-    public ApiResponse<ResumeResponse> updateResume(UpdateResumeRequest request){
+    public ResumeResponse updateResume(UpdateResumeRequest request) {
+        Long currentUserId  = securityHelper.getAuthenticatedUserId();
+
         Resume resume = resumeRepository.findById(request.getResumeId()).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
+
+        // Add auth check here
+        if (!resume.getUser().getId().equals(currentUserId)) {
+            throw new RuntimeException("Unauthorized");
+        }
 
         // validate and update each input
         if (request.getDomain() != null) {
@@ -412,7 +301,8 @@ public class ResumeService {
         }
 
         if (request.getTemplateId() != null) {
-            resume.setTemplate(request.getTemplateId());
+            Template template = templateRepository.findById(request.getTemplateId()).orElseThrow(() -> new RuntimeException("No template found with provided Id" + request.getTemplateId()));
+            resume.setTemplate(template);
         }
 
         if (request.getFormat() != null) {
@@ -421,7 +311,33 @@ public class ResumeService {
 
         resumeRepository.save(resume);
 
-        ResumeResponse resumeResponse = ResumeResponse.builder()
+        log.info("Resume updated successfully, by provided id: {}", resume.getId());
+
+        return mapToResponse(resume);
+    }
+
+    // download resume here call the file service to give the download url
+    public String downloadResume(Long id){
+        Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
+
+        Long userId = securityHelper.getAuthenticatedUserId();
+
+        if (!resume.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Unauthorized access");
+        }
+
+        log.info("Resume downloaded successfully, by provided id: {}", resume.getId());
+
+        if (resume.getFileUrl() == null) {
+            throw new RuntimeException("Resume file not generated yet");
+        }
+
+        return resume.getFileUrl();
+    }
+
+
+    private ResumeResponse mapToResponse(Resume resume) {
+        return ResumeResponse.builder()
                 .id(resume.getId())
                 .domain(resume.getDomain())
                 .jobDescription(resume.getJobDescription())
@@ -432,26 +348,7 @@ public class ResumeService {
                 .createdAt(resume.getCreatedAt())
                 .updatedAt(resume.getUpdatedAt())
                 .build();
-
-        log.info("Resume updated successfully, by provided id: {}", resume.getId());
-
-        return ApiResponse.<ResumeResponse>builder()
-                .status("success")
-                .message("Resumes updated successfully with provided id "+ request.getResumeId())
-                .data(resumeResponse)
-                .build();
     }
 
-    // download resume here call the file service to give the download url
-    public ApiResponse<String> downloadResume(Long id){
-        Resume resume = resumeRepository.findById(id).orElseThrow(() -> new RuntimeException("No Resume found with Provided Id"));
 
-        log.info("Resume downloaded successfully, by provided id: {}", resume.getId());
-
-        return ApiResponse.<String>builder()
-                .status("success")
-                .message("Resumes downloaded successfully with provided id"+ id)
-                .data("www.goog.eom")
-                .build();
-    }
 }
