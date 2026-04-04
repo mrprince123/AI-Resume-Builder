@@ -16,32 +16,65 @@ import java.util.List;
 public class TemplateController {
 
     @Autowired
-    private TemplateService  templateService;
-
+    private TemplateService templateService;
 
     @PostMapping("/")
-    private ApiResponse<String> createTemplate(@RequestBody TemplateRequest request){
-        return  templateService.createTemplate(request);
+    private ApiResponse<String> createTemplate(@RequestBody TemplateRequest request) {
+        String templateName = templateService.createTemplate(request);
+
+        // return the response.
+        return ApiResponse.<String>builder()
+                .status("200")
+                .message("Template created successfully")
+                .data(templateName)
+                .build();
     }
 
     @DeleteMapping("/{id}")
-    private ApiResponse<Void> deleteTemplate(@PathVariable Long id){
-        return  templateService.deleteTemplate(id);
+    private ApiResponse<Void> deleteTemplate(@PathVariable Long id) {
+        templateService.deleteTemplate(id);
+
+        // return the response.
+        return ApiResponse.<Void>builder()
+                .status("success")
+                .message("Template with id deleted successfully" + id)
+                .data(null)
+                .build();
     }
 
     @PutMapping("/{id}")
-    private ApiResponse<String> updateTemplate(@PathVariable Long id, @RequestBody TemplateRequest request){
-        return  templateService.updateTemplate(id, request);
+    private ApiResponse<Template> updateTemplate(@PathVariable Long id, @RequestBody TemplateRequest request) {
+        Template template = templateService.updateTemplate(id, request);
+
+        // return the response.
+        return ApiResponse.<Template>builder()
+                .status("success")
+                .message("Template with id deleted successfully" + id)
+                .data(template)
+                .build();
     }
 
     @GetMapping("/")
-    private ApiResponse<List<Template>> getAllTemplate(){
-        return  templateService.getAllTemplate();
+    private ApiResponse<List<Template>> getAllTemplate() {
+        List<Template> templates = templateService.getAllTemplate();
+
+        // return the response.
+        return ApiResponse.<List<Template>>builder()
+                .status("success")
+                .message("Templates fetched successfully")
+                .data(templates)
+                .build();
     }
 
     @GetMapping("/{id}")
-    private ApiResponse<Template> createTemplate(@PathVariable Long id){
-        return  templateService.getTemplateById(id);
-    }
+    private ApiResponse<Template> createTemplate(@PathVariable Long id) {
+        Template template = templateService.getTemplateById(id);
 
+        // return the response.
+        return ApiResponse.<Template>builder()
+                .status("success")
+                .message("Template with provided id fetched successfully" + id)
+                .data(template)
+                .build();
+    }
 }

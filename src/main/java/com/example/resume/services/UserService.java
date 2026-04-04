@@ -71,7 +71,7 @@ public class UserService implements UserDetailsService {
 
     //    1. Update Profile Function
     @Transactional
-    public ApiResponse<UserProfileDetails> updateProfile(String username, UpdateProfileRequest request) {
+    public UserProfileDetails updateProfile(String username, UpdateProfileRequest request) {
         // 1. Find the user
         User user = userRepository.findByUserName(username);
         if (user == null) {
@@ -95,14 +95,11 @@ public class UserService implements UserDetailsService {
         userDetailRepository.save(userDetails);
         log.info("Profile updated successfully for user: {}", username);
 
-        return ApiResponse.<UserProfileDetails>builder()
-                .status("success")
-                .message("Profile Updated Successfully")
-                .data(userDetails)
-                .build();
+        return userDetails;
+
     }
 
-    public ApiResponse<User> updateAvatar(String username, String avatarUrl) {
+    public User updateAvatar(String username, String avatarUrl) {
         User user = userRepository.findByUserName(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found " + username);
@@ -118,14 +115,11 @@ public class UserService implements UserDetailsService {
         log.info("User Avatar Updated Successfully for user id: {}", user.getId());
         userDetailRepository.save(userDetails);
 
-        return ApiResponse.<User>builder()
-                .status("success")
-                .message("User Avatar Updated")
-                .data(user)
-                .build();
+        return user;
+
     }
 
-    public ApiResponse<Void> softDeleteProfile(String username) {
+    public void softDeleteProfile(String username) {
         // 1. find the user
         User user = userRepository.findByUserName(username);
         if (user == null) {
@@ -158,15 +152,9 @@ public class UserService implements UserDetailsService {
 
         log.info("Account soft-deleted for user id: {}", user.getId());
 
-
-        return ApiResponse.<Void>builder()
-                .status("success")
-                .message("Account deleted successfully")
-                .data(null)
-                .build();
     }
 
-    public ApiResponse<UserProfileDetails> getUserProfile(String username) {
+    public UserProfileDetails getUserProfile(String username) {
         User user = userRepository.findByUserName(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found: " + username);
@@ -177,14 +165,11 @@ public class UserService implements UserDetailsService {
             throw new UsernameNotFoundException("User Details not found: " + username);
         }
 
-        return ApiResponse.<UserProfileDetails>builder()
-                .status("success")
-                .message("User Profile Fetched Successfully")
-                .data(userDetails)
-                .build();
+        return userDetails;
+
     }
 
-    public ApiResponse<User> changePassword(String username, ChangePasswordRequest request){
+    public User changePassword(String username, ChangePasswordRequest request){
         // Find the User
         User user = userRepository.findByUserName(username);
         if (user == null) {
@@ -200,11 +185,7 @@ public class UserService implements UserDetailsService {
         log.info("User Password Changed Successfully for user id: {}", user.getId());
         userRepository.save(user);
 
-        return ApiResponse.<User>builder()
-                .status("success")
-                .message("Password changed successfully")
-                .data(user)
-                .build();
+        return user;
     }
 
 

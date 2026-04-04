@@ -22,36 +22,69 @@ public class AuthController {
 
     @PostMapping("/register")
     public ApiResponse<AuthResponse> register(@RequestBody RegisterRequest request) {
-        return authService.register(request);
+        AuthResponse authResponse = authService.register(request);
+
+        return ApiResponse.<AuthResponse>builder()
+                .status("success")
+                .message("Login Successful")
+                .data(authResponse)
+                .build();
     }
 
     @GetMapping("/verify")
-    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
-        return ResponseEntity.ok(authService.verifyEmail(token));
+    public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
-        return authService.login(loginRequest, request);
+        AuthResponse authResponse = authService.login(loginRequest, request);
+
+        return ApiResponse.<AuthResponse>builder()
+                .status("success")
+                .message("Login Successful")
+                .data(authResponse)
+                .build();
     }
 
     @PostMapping("/{username}/logout")
     public ApiResponse<Void> logout(@PathVariable String username, HttpServletRequest request) {
-        return authService.logout(username, request);
+        authService.logout(username, request);
+
+        return ApiResponse.<Void>builder()
+                .status("success")
+                .message("Logged out successfully")
+                .data(null)
+                .build();
     }
 
     @PostMapping("/refresh")
     public ApiResponse<AuthResponse> refreshToken(@RequestBody String token) {
-        return authService.refreshToken(token);
+        AuthResponse authResponse = authService.refreshToken(token);
+
+        return ApiResponse.<AuthResponse>builder()
+                .status("success")
+                .message("Token refreshed successfully")
+                .data(authResponse)
+                .build();
     }
 
     @PostMapping("/google")
     public ApiResponse<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request) {
-        return authService.googleLogin(request);
+        AuthResponse authResponse = authService.googleLogin(request);
+
+        return ApiResponse.<AuthResponse>builder()
+                .status("success")
+                .message("Login successful")
+                .data(authResponse)
+                .build();
     }
 
     @GetMapping("/test")
     private ResponseEntity<String> test() {
         return ResponseEntity.ok("Hello world Sniper");
     }
+
+
 }

@@ -18,8 +18,8 @@ public class AIService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ResumeContent analyseJobDescription(Domain domain, String jobDescription) {
-        String rawResponse = analyseResumeContents(domain, jobDescription);
+    public ResumeContent analyseJobDescription(Domain domain, String jobDescription, String htmlContent) {
+        String rawResponse = analyseResumeContents(domain, jobDescription, htmlContent);
         log.info("Raw AI response received for domain: {}", domain);
 
         ResumeContent content = parseAIResponse(rawResponse);
@@ -29,14 +29,14 @@ public class AIService {
         return content;
     }
 
-    private String analyseResumeContents(Domain domain, String jobDescription) {
+    private String analyseResumeContents(Domain domain, String jobDescription, String htmlContent) {
 
         Client client = new Client.Builder()
                 .apiKey(apiKey)
                 .build();
 
 
-        String prompt = buildPrompt(domain, jobDescription);
+        String prompt = buildPrompt(domain, jobDescription, htmlContent);
 
         GenerateContentResponse response = client.models
                 .generateContent("gemini-2.0-flash", prompt, null);
@@ -46,44 +46,67 @@ public class AIService {
         return response.text();
     }
 
-    private String buildPrompt(Domain domain, String jobDescription) {
+    private String buildPrompt(Domain domain, String jobDescription, String htmlContent) {
         return """
-                You are an expert resume writer with 10+ years of experience
-                crafting professional resumes for %s roles.
-                
-                Your task is to analyze the job description below and generate
-                a highly tailored resume content in JSON format.
-                
-                Follow these rules strictly:
-                - summary     : Write a 3-4 sentence professional summary that
-                                highlights relevant experience, skills, and value
-                                the candidate brings to this specific role.
-                - skills      : Extract 8-12 most relevant technical and soft
-                                skills directly mentioned or implied in the JD.
-                - experience  : Write 4-6 strong bullet points using action verbs
-                                (e.g. Developed, Managed, Optimized, Led).
-                                Each bullet should highlight impact and results.
-                - education   : Suggest the most relevant degree or certification
-                                that matches this role.
-                - keywords    : Extract 8-10 ATS keywords directly from the JD.
-                                These are words a recruiter would search for.
-                
-                Return ONLY this exact JSON structure with no extra text,
-                no markdown, no backticks, no explanation:
-                {
-                    "summary"    : "professional summary here",
-                    "skills"     : ["skill1", "skill2", "skill3"],
-                    "experience" : [
-                        "Action verb + task + result/impact",
-                        "Action verb + task + result/impact"
-                    ],
-                    "education"  : ["Relevant degree or certification"],
-                    "keywords"   : ["keyword1", "keyword2", "keyword3"]
-                }
-                
-                Job Domain      : %s
-                Job Description : %s
-                """.formatted(domain, domain, jobDescription);
+            You are an expert resume writer with 10+ years of experience
+            crafting professional resumes for %s roles.
+
+            Your task is to:
+            1. Analyze the provided HTML template structure
+            2. Understand how content is organized (sections, headings, lists, etc.)
+            3. Generate resume content that BEST FITS into that exact structure
+
+            IMPORTANT:
+            - Do NOT return HTML
+            - Do NOT modify the template
+            - ONLY generate structured JSON data that maps cleanly to the template
+
+            The HTML template defines how the resume is structured.
+            You must infer:
+            - Section ordering
+            - Whether content is short/long
+            - Whether lists (<li>) or paragraphs (<p>) are expected
+            - How many items fit naturally in each section
+
+            Based on that, generate optimized content.
+
+            Follow these rules strictly:
+
+            - summary:
+              Generate content that fits inside paragraph tags (<p>).
+              Keep it concise (3-4 sentences max).
+
+            - skills:
+              If the template uses lists, generate 8-12 short bullet-friendly skills.
+              If compact layout is implied, keep skills short (1-2 words each).
+
+            - experience:
+              Generate bullet points that fit inside <li> elements.
+              Use strong action verbs (Developed, Led, Optimized, Built).
+              Keep each point concise and impact-focused.
+
+            - education:
+              Provide 1-2 relevant degrees/certifications.
+              Keep formatting clean and short.
+
+            - keywords:
+              Extract 8-10 ATS-friendly keywords from the job description.
+
+            Ensure:
+            - Content length matches the template design (avoid overflow)
+            - Bullet points are clean and scannable
+            - No unnecessary verbosity
+            - Content aligns with job description
+
+            Return ONLY this JSON (no extra text):
+            Based on the htmlContent Structure provided to you %s,
+
+            Job Domain      : %s
+            Job Description : %s
+
+            HTML Template:
+            %s
+            """.formatted(domain, domain, jobDescription, htmlContent);
     }
 
     private ResumeContent parseAIResponse(String rawResponse) {

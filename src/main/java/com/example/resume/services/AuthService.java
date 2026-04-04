@@ -68,23 +68,15 @@ public class AuthService {
     @Autowired
     private JwtService jwtService;
 
-    public ApiResponse<AuthResponse> register(RegisterRequest request){
+    public AuthResponse register(RegisterRequest request) {
         try {
 
             if (userService.existsByUsername(request.getUserName())) {
-                return ApiResponse.<AuthResponse>builder()
-                        .status("failed")
-                        .message("Username already exists")
-                        .data(null)
-                        .build();
+                throw new RuntimeException("Username already exists");
             }
 
             if (userService.existsByEmail(request.getEmail())) {
-                return ApiResponse.<AuthResponse>builder()
-                        .status("failed")
-                        .message("Email already exists")
-                        .data(null)
-                        .build();
+                throw new RuntimeException("Email already exists");
             }
 
             User newUser = new User();
@@ -122,35 +114,22 @@ public class AuthService {
                     .expiresIn(900)
                     .build();
 
-            return ApiResponse.<AuthResponse>builder()
-                    .status("success")
-                    .message("Login Successful")
-                    .data(authResponse)
-                    .build();
-
-
-        } catch (Exception e){
+            return authResponse;
+        } catch (Exception e) {
             log.error("Unexpected register error for user: {}", request.getEmail(), e);
-            return ApiResponse.<AuthResponse>builder()
-                    .status("failed")
-                    .message("An unexpected error occurred. Please try again.")
-                    .data(null)
-                    .build();
+            throw new RuntimeException("An unexpected error occurred. Please try again.");
         }
     }
 
-    public ApiResponse<Void> verifyEmail(String token){
+    public void verifyEmail(String token) {
         try {
             // find the token first
             VerificationToken verificationToken = verificationTokenRepository.findByToken(token).orElseThrow(() -> new RuntimeException("Invalid verification token"));
 
             // check if token is expired
-            if(verificationToken.getExpiresAt().isBefore(LocalDateTime.now())){
+            if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
                 verificationTokenRepository.delete(verificationToken);
-                return ApiResponse.<Void>builder()
-                        .status("failed")
-                        .message("Verification link has expired. Please register again.")
-                        .build();
+                throw new RuntimeException("Verification link has expired. Please register again.");
             }
 
             // Mark user as verified
@@ -162,36 +141,25 @@ public class AuthService {
 
             log.info("Email verified successully for user: {}", user.getEmail());
 
-            return ApiResponse.<Void>builder()
-                    .status("success")
-                    .message("Email verified successfully! You can now login.")
-                    .build();
-
-        } catch (Exception e){
+        } catch (Exception e) {
             log.error("Email verification error", e);
-            return ApiResponse.<Void>builder()
-                    .status("failed")
-                    .message("Invalid or expired verification token.")
-                    .build();
+
+            throw new RuntimeException("Invalid or expired verification token.");
+
         }
     }
 
-    public ApiResponse<AuthResponse> login(LoginRequest request, HttpServletRequest httpServletRequest){
-
+    public AuthResponse login(LoginRequest request, HttpServletRequest httpServletRequest) {
 
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUserName(), request.getPassword())
             );
 
-            User user =  userService.findByUsername(request.getUserName());
+            User user = userService.findByUsername(request.getUserName());
 
-            if(!user.isVerified()){
-                return ApiResponse.<AuthResponse>builder()
-                        .status("failed")
-                        .message("Please verify your email before logging in.")
-                        .data(null)
-                        .build();
+            if (!user.isVerified()) {
+                throw new RuntimeException("Please verify your email before logging in.");
             }
 
             String accessToken = jwtUtil.generateAccessToken(user.getUserName());
@@ -216,25 +184,19 @@ public class AuthService {
 
             updateUserMeta(user, httpServletRequest);
 
-            return ApiResponse.<AuthResponse>builder()
-                    .status("success")
-                    .message("Login Successful")
-                    .data(authResponse)
-                    .build();
+            return authResponse;
+
 
         } catch (Exception e) {
             log.error("Unexpected login error for user: {}", request.getUserName(), e);
-            return ApiResponse.<AuthResponse>builder()
-                    .status("failed")
-                    .message("An unexpected error occurred. Please try again.")
-                    .data(null)
-                    .build();
+
+            throw new RuntimeException("An unexpected error occurred. Please try again.");
         }
     }
 
-    private void updateUserMeta(User user, HttpServletRequest request){
+    private void updateUserMeta(User user, HttpServletRequest request) {
         UserProfileDetails userProfileDetails = userDetailRepository.findByUser(user);
-        if(userProfileDetails == null) return;
+        if (userProfileDetails == null) return;
 
         UserMeta userMeta = userMetaExtractor.extract(request);
         userProfileDetails.setUserMeta(userMeta);
@@ -243,7 +205,7 @@ public class AuthService {
         log.info("UserMeta updated for user: {} from IP: {}", user.getUserName(), userMeta.getLastLoginIp());
     }
 
-    public ApiResponse<AuthResponse> refreshToken(String token) {
+    public AuthResponse refreshToken(String token) {
         String username = jwtUtil.extractUsername(token);
 
         UserDetails user = userService.loadUserByUsername(username);
@@ -262,14 +224,12 @@ public class AuthService {
                 .expiresIn(900)
                 .build();
 
-        return ApiResponse.<AuthResponse>builder()
-                .status("success")
-                .message("Token refreshed successfully")
-                .data(authResponse)
-                .build();
+        return authResponse;
+
+
     }
 
-    public ApiResponse<AuthResponse> googleLogin(GoogleAuthRequest request){
+    public AuthResponse googleLogin(GoogleAuthRequest request) {
         try {
             GoogleIdToken.Payload payload = googleTokenVerifier.verify(request.getIdToken());
 
@@ -279,7 +239,6 @@ public class AuthService {
             String picture = (String) payload.get("picture");
 
             User user = userRepository.findByEmail(email).orElseGet(() -> {
-
 
                 // Auto Generate unique username from email
                 String baseUsername = email.split("@")[0];
@@ -293,8 +252,15 @@ public class AuthService {
                 newUser.setPassword(null);
                 newUser.setRole(Role.USER);
 
-               return userRepository.save(newUser);
+                return userRepository.save(newUser);
             });
+
+            // User Detailed Saved
+            UserProfileDetails userDetails = userDetailRepository.findByUser(user);
+            userDetails.setFirstName(fullName);
+            userDetails.setAvatar(picture);
+            userDetailRepository.save(userDetails);
+
 
             // If existing user, link Google ID if not already linked
             if (user.getGoogleId() == null) {
@@ -323,20 +289,12 @@ public class AuthService {
 
             log.info("Google login successful for: {}", email);
 
-            return ApiResponse.<AuthResponse>builder()
-                    .status("success")
-                    .message("Login successful")
-                    .data(authResponse)
-                    .build();
+            return authResponse;
 
 
-        } catch (Exception e){
+        } catch (Exception e) {
             log.error("Google login error", e);
-            return ApiResponse.<AuthResponse>builder()
-                    .status("failed")
-                    .message("Google login failed. Please try again.")
-                    .data(null)
-                    .build();
+            throw new RuntimeException("Google login failed. Please try again.");
         }
 
     }
@@ -350,7 +308,7 @@ public class AuthService {
         return username;
     }
 
-    public ApiResponse<Void> logout(String username, HttpServletRequest request) {
+    public void logout(String username, HttpServletRequest request) {
         User user = userRepository.findByUserName(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found: " + username);
@@ -365,11 +323,6 @@ public class AuthService {
 
         log.info("User logged out: {}", username);
 
-        return ApiResponse.<Void>builder()
-                .status("success")
-                .message("Logged out successfully")
-                .data(null)
-                .build();
     }
 
 

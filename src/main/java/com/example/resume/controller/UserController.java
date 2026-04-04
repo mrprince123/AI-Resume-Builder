@@ -24,7 +24,13 @@ public class UserController {
     public ApiResponse<UserProfileDetails> updateUserProfile(
             @PathVariable String username,
             @RequestBody UpdateProfileRequest request) {
-        return userService.updateProfile(username, request);
+        UserProfileDetails userProfileDetails = userService.updateProfile(username, request);
+
+        return ApiResponse.<UserProfileDetails>builder()
+                .status("success")
+                .message("Profile Updated Successfully")
+                .data(userProfileDetails)
+                .build();
     }
 
     // PUT /api/v1/user/{username}/avatar
@@ -32,25 +38,49 @@ public class UserController {
     public ApiResponse<User> updateUserAvatar(
             @PathVariable String username,
             @RequestBody String avatarUrl) {
-        return userService.updateAvatar(username, avatarUrl);
+        User user = userService.updateAvatar(username, avatarUrl);
+
+        return ApiResponse.<User>builder()
+                .status("success")
+                .message("User Avatar Updated")
+                .data(user)
+                .build();
     }
 
     // DELETE /api/v1/user/{username}
     @DeleteMapping("/{username}")
     public ApiResponse<Void> softDeleteUserProfile(
             @PathVariable String username) {
-        return userService.softDeleteProfile(username);
+        userService.softDeleteProfile(username);
+
+        return ApiResponse.<Void>builder()
+                .status("success")
+                .message("Account deleted successfully")
+                .data(null)
+                .build();
     }
 
     // GET /api/v1/user/{username}/profile
     @GetMapping("/{username}/profile")
     public ApiResponse<UserProfileDetails> getUserProfile(@PathVariable String username) {
-        return userService.getUserProfile(username);
+        UserProfileDetails userProfileDetails = userService.getUserProfile(username);
+
+        return ApiResponse.<UserProfileDetails>builder()
+                .status("success")
+                .message("User Profile Fetched Successfully")
+                .data(userProfileDetails)
+                .build();
     }
 
     @PostMapping("/{username}/changePassword")
     public ApiResponse<User> changePassword(@PathVariable String username, @RequestBody ChangePasswordRequest request) {
-        return userService.changePassword(username, request);
+        User user = userService.changePassword(username, request);
+
+        return ApiResponse.<User>builder()
+                .status("success")
+                .message("Password changed successfully")
+                .data(user)
+                .build();
     }
 
 }

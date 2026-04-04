@@ -20,17 +20,12 @@ public class TemplateService {
     private TemplateRepository templateRepository;
 
     // create template
-    public ApiResponse<String> createTemplate(TemplateRequest request) {
-
+    public String createTemplate(TemplateRequest request) {
         Template templateExists = templateRepository.findByName(request.getName());
 
         // find if the template with the same name already exits
         if (templateExists != null) {
-            return ApiResponse.<String>builder()
-                    .status("404")
-                    .message("Template with this name already exits")
-                    .data(null)
-                    .build();
+            throw new RuntimeException("Template with this name already exits");
         }
 
         // if not then create one
@@ -42,16 +37,12 @@ public class TemplateService {
 
         log.info("New Template created successfully: {}", request.getName());
 
-        // return the response.
-        return ApiResponse.<String>builder()
-                .status("200")
-                .message("Template created successfully")
-                .data(template.getName())
-                .build();
+        return template.getName();
+
     }
 
     // delete template
-    public ApiResponse<Void> deleteTemplate(long id) {
+    public void deleteTemplate(long id) {
 
         // find if the template with the same name already exits
         Template template = templateRepository.findById(id)
@@ -60,79 +51,53 @@ public class TemplateService {
         templateRepository.delete(template);
 
         log.info("Template deleted successfully: {}", id);
-
-        // return the response.
-        return ApiResponse.<Void>builder()
-                .status("success")
-                .message("Template with id deleted successfully" + id)
-                .data(null)
-                .build();
-
     }
 
     // update template
-    public ApiResponse<String> updateTemplate(long id, TemplateRequest request) {
+    public Template updateTemplate(long id, TemplateRequest request) {
 
         // find if the template with the same name already exits
         Template template = templateRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Template not found: " + id));
-
 
         if (request.getName() != null) {
             template.setName(request.getName());
         }
 
         if (request.getTemplatePreview() != null) {
-            template.setName(request.getTemplatePreview());
+            template.setTemplatePreview(request.getTemplatePreview());
         }
 
-
         if (request.getHtmlContents() != null) {
-            template.setName(request.getHtmlContents());
+            template.setHtmlContents(request.getHtmlContents());
         }
 
         templateRepository.save(template);
         log.info("Template updated successfully: {}", id);
 
-        // return the response.
-        return ApiResponse.<String>builder()
-                .status("success")
-                .message("Template with id deleted successfully" + id)
-                .data(String.valueOf(template))
-                .build();
+        return template;
 
     }
 
     // get all template
-    public ApiResponse<List<Template>> getAllTemplate() {
+    public List<Template> getAllTemplate() {
 
         List<Template> templates = templateRepository.findAll();
 
-
         log.info("All templates fetched successfully, count: {}", templates.size());
 
-        // return the response.
-        return ApiResponse.<List<Template>>builder()
-                .status("success")
-                .message("Templates fetched successfully")
-                .data(templates)
-                .build();
+        return templates;
     }
 
     // get Template byId
-    public ApiResponse<Template> getTemplateById(long id) {
+    public Template getTemplateById(long id) {
 
         Template template = templateRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Template not found: " + id));
 
         log.info("Template fetched successfully: {}", id);
 
-        // return the response.
-        return ApiResponse.<Template>builder()
-                .status("success")
-                .message("Template with provided id fetched successfully" + id)
-                .data(template)
-                .build();
+    return     template;
     }
 
     public String renderTemplate(Template template, ResumeContent content) {

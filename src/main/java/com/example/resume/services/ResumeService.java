@@ -89,7 +89,7 @@ public class ResumeService {
 
         // 4. trigger AI generation pipeline
         try {
-            generateResume(resume);
+            generateResume(resume, template.getHtmlContents());
             log.info("Resume generated successfully, id: {}", resume.getId());
         } catch (Exception e) {
             log.error("Resume generation failed, id: {}, error: {}",
@@ -104,13 +104,14 @@ public class ResumeService {
     // generate resume - performs the full AI pipeline
     @Async
     @Transactional
-    public void generateResume(Resume resume){
+    public void generateResume(Resume resume, String htmlContent){
         try {
             // 1. send job description to Gemini → get structured JSON back
             log.info("Starting AI analysis for resume id: {}", resume.getId());
             ResumeContent content = aiService.analyseJobDescription(
                     resume.getDomain(),
-                    resume.getJobDescription()
+                    resume.getJobDescription(),
+                    htmlContent
             );
             log.info("AI analysis completed for resume id: {}", resume.getId());
 
@@ -175,7 +176,10 @@ public class ResumeService {
         resumeRepository.save(resume);
         log.info("Resume reset to PENDING for regeneration, id: {}", resumeId);
 
-        generateResume(resume);
+        Template template = resume.getTemplate();
+        String htmlContent = template.getHtmlContents();
+
+        generateResume(resume, htmlContent);
 
         log.info("Resume generated successfully, id: {}", resume.getId());
 
